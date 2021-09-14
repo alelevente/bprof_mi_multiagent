@@ -1,8 +1,0 @@
-netgenerate --rand -o network.net.xml --rand.iterations=50
-
-python3 $SUMO_HOME/tools/randomTrips.py -n network.net.xml -o flows.xml --begin 0 --end 1 --flows 400 --jtrrouter --trip-attributes 'departPos="random" departSpeed="max"'
-
-jtrrouter -c flow_gen.jtrrcfg --vtype-output vtype.xml
-
-python3 $SUMO_HOME/tools/generateParkingAreaRerouters.py -n network.net.xml -a parkings.add.xml --max-distance-alternatives 10000 --max-distance-visibility-true 1000 -o parking_rerouters.add.xml
-

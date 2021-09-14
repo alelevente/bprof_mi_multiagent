@@ -1,6 +1,8 @@
 #Others:
 *.swp
 scenario/generator/*.xml
+scenario/scenario_creation_commands.txt
+outputs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

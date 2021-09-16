@@ -1,0 +1,143 @@
+import numpy as np
+
+
+############################################
+# Buyer implementation:
+class Buyer:
+    def __init__(self, auctions, max_bid, pref_function):
+        self.auctions = auctions[:]
+        self.max_bid = max_bid
+        self.act_bids = [0 for i in range(len(auctions))]
+        self.preference = 0
+        self.pref_function = pref_function
+        self.auction_won = False
+        
+    def ask_bid(self, auction, current_bid):
+        if (current_bid > self.max_bid) or (self.auction_won):
+            return False
+        
+        idx = self.auctions.index(auction) #identifying auction
+        #collecting current bids:
+        bids = self.act_bids
+        bids[idx] = current_bid 
+        #calculating preferences:
+        current_preference = pref_function(bids)
+        if current_preference == idx:
+            #when the auction is preferred:
+            #checking whether the buyer is currently winning at another auction:
+            winning = False
+            for auction in self.auctions:
+                winning = (winning) or (auction.winner == self)
+            #if the buyer is not a winner of an auction, it can bid on the current auction:
+            if not(winning): return True
+        
+        return False
+    
+    def tell_won(self):
+        self.auction_won = True
+    
+#############################################
+# Auctioneer implementation:
+class Auctioneer:
+    def __init__(self, starting_price, bid_step):
+        self.starting_price = starting_price
+        self.current_price = starting_price
+        self.bid_step = bid_step
+        self.buyers = []
+        self.winner = None
+        self.no_winner = 0
+        self.status = "running" #status of the auction
+        
+    def add_buyer(self, buyer):
+        self.buyers.append(buyer)
+        
+    def make_auction_round(self):
+        #check if buyers want to bid at the current price:
+        was_winner = False
+        for buyer in self.buyers:
+            if buyer.ask_bid(self, self.current_price):
+                #buyer is willing to give the current bid
+                self.current_price += self.bid_step
+                self.winner = buyer
+                self.no_winner = 0
+                was_winner = True
+        
+        if not(was_winner):
+            self.no_winner += 1
+        
+        if self.no_winner >= 3:
+            #Going once, going twice, then its gone!
+            if not(self.winner is None):
+                self.status = "won"
+                winner.tell_won()
+            else:
+                self.status = "terminated"
+                
+                
+#############################################
+# Running auctions:
+
+def _check_run_condition(auctions, buyers):
+    """Checks whether the auctions shall run one more round."""
+    if len(auctions)<=len(buyers):
+        num_running = 0
+        for auction in auctions:
+            if auction.status == "running": num_running += 1
+        return num_running > 0
+    else:
+        num_won = 0
+        for buyer in buyers:
+            if buyer.auction_won: num_won += 1
+        return num_von >= len(buyers)
+
+def run_auctions(auctions, buyers, run_to_completeness=True):
+    #initializing auctions:
+    for buyer in buyers:
+        for auction in auctions:
+            auction.add_buyer(buyer)
+            
+    #running auctions:
+    while _check_run_conditions(auctions, buyers):
+        for auction in auctions:
+            auction.make_auction_round()
+            
+    #collecting results:
+    auctions_won = []
+    auctions_terminated = []
+    buyers_terminated = []
+    for auction in auctions:
+        if auction.status == "won":
+            auctions_won.append(
+                {"auction_index": auctions.index(auction),
+                 "buyer_index": buyers.index(auction.winner),
+                 "price": auction.current_price-auction.bid_step})
+        else:
+            auctions_terminated.append(auction)
+            
+    if not(run_to_completeness): return auctions_won
+    
+    #when running to completeness:
+    for buyer in buyers:
+        if not(buyer.won):
+            buyers_terminated.append(buyer)
+                
+    #initializing new participants:
+    new_auctions = []
+    new_buyers = []
+    for auction in auctions_terminated:
+        new_auction = Auctioneer(auction.starting_price, auction.bid_step)
+        new_auctions.append(new_auction)
+    for buyer in buyers_terminated:
+        new_buyer = Buyer(new_auctions, buyer.max_bid, buyer.pref_function)
+        new_buyers.append(new_buyer)
+    if (len(new_auctions) > 0) and (len(new_buyers) > 0):
+        new_run_results = run_auctions(new_auctions, new_buyers, run_to_completeness)
+        
+        #mapping back to original indices:
+        for result in new_run_results:
+            auctions_won.append({
+                "auction_index": auctions.index(new_auctions[result["auction_index"]]),
+                "buyer_index": buyers.index(new_buyers[result["buyer_index"]]),
+                "price": result.price
+            })
+    return auctions_won

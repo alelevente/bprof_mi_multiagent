@@ -28,7 +28,9 @@ By the end of the laboratory, the students are expected to:
 2. Design the auction mechanism for parking lot assignment
 3. Run, and evaluate the auction coordinated simulation (cooperative parking scenario)
  
-## **Material development phases**
+ 
+---
+### **Material development phases**
 [x] Setting up a simulation scenario
 
 [] Providing the auction backend

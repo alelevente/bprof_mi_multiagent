@@ -30,8 +30,13 @@ By the end of the laboratory, the students are expected to:
  
 ## **Material development phases**
 [x] Setting up a simulation scenario
+
 [] Providing the auction backend
+
 [] Elaborating the laboratory tasks
+
 [] Conducting measurements
+
 [] Asking for feedbacks
+
 [] Refine materials acc. to feedbacks

@@ -21,7 +21,7 @@ class Buyer:
         bids = self.act_bids
         bids[idx] = current_bid 
         #calculating preferences:
-        current_preference = pref_function(bids)
+        current_preference = self.pref_function(bids)
         if current_preference == idx:
             #when the auction is preferred:
             #checking whether the buyer is currently winning at another auction:
@@ -29,11 +29,11 @@ class Buyer:
             for auction in self.auctions:
                 winning = (winning) or (auction.winner == self)
             #if the buyer is not a winner of an auction, it can bid on the current auction:
-            if not(winning): return True
+            return not(winning)
         
         return False
     
-    def tell_won(self):
+    def tell_won(self, auction):
         self.auction_won = True
     
 #############################################
@@ -52,6 +52,7 @@ class Auctioneer:
         self.buyers.append(buyer)
         
     def make_auction_round(self):
+        if self.status != "running": return
         #check if buyers want to bid at the current price:
         was_winner = False
         for buyer in self.buyers:
@@ -69,7 +70,7 @@ class Auctioneer:
             #Going once, going twice, then its gone!
             if not(self.winner is None):
                 self.status = "won"
-                winner.tell_won()
+                self.winner.tell_won(self)
             else:
                 self.status = "terminated"
                 
@@ -77,7 +78,7 @@ class Auctioneer:
 #############################################
 # Running auctions:
 
-def _check_run_condition(auctions, buyers):
+def _check_run_conditions(auctions, buyers):
     """Checks whether the auctions shall run one more round."""
     if len(auctions)<=len(buyers):
         num_running = 0
@@ -88,7 +89,7 @@ def _check_run_condition(auctions, buyers):
         num_won = 0
         for buyer in buyers:
             if buyer.auction_won: num_won += 1
-        return num_von >= len(buyers)
+        return num_won < len(buyers)
 
 def run_auctions(auctions, buyers, run_to_completeness=True):
     #initializing auctions:
@@ -104,7 +105,6 @@ def run_auctions(auctions, buyers, run_to_completeness=True):
     #collecting results:
     auctions_won = []
     auctions_terminated = []
-    buyers_terminated = []
     for auction in auctions:
         if auction.status == "won":
             auctions_won.append(
@@ -115,20 +115,22 @@ def run_auctions(auctions, buyers, run_to_completeness=True):
             auctions_terminated.append(auction)
             
     if not(run_to_completeness): return auctions_won
-    
     #when running to completeness:
-    for buyer in buyers:
-        if not(buyer.won):
-            buyers_terminated.append(buyer)
-                
+    buyer_map = []
+    for i in range(len(buyers)):
+        if not(buyers[i].auction_won):
+            buyer_map.append(i)
+               
     #initializing new participants:
-    new_auctions = []
-    new_buyers = []
+    new_auctions, new_buyers = [], [] #lists of new participants
+    auction_map = [] # mapping new indices to the original ones
+    
     for auction in auctions_terminated:
         new_auction = Auctioneer(auction.starting_price, auction.bid_step)
         new_auctions.append(new_auction)
-    for buyer in buyers_terminated:
-        new_buyer = Buyer(new_auctions, buyer.max_bid, buyer.pref_function)
+        auction_map.append(auctions.index(auction))
+    for i in buyer_map:
+        new_buyer = Buyer(new_auctions, buyers[i].max_bid, buyers[i].pref_function)
         new_buyers.append(new_buyer)
     if (len(new_auctions) > 0) and (len(new_buyers) > 0):
         new_run_results = run_auctions(new_auctions, new_buyers, run_to_completeness)
@@ -136,8 +138,8 @@ def run_auctions(auctions, buyers, run_to_completeness=True):
         #mapping back to original indices:
         for result in new_run_results:
             auctions_won.append({
-                "auction_index": auctions.index(new_auctions[result["auction_index"]]),
-                "buyer_index": buyers.index(new_buyers[result["buyer_index"]]),
-                "price": result.price
+                "auction_index": auction_map[result["auction_index"]],
+                "buyer_index": buyer_map[result["buyer_index"]],
+                "price": result["price"]
             })
     return auctions_won

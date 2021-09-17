@@ -11,6 +11,7 @@ class Buyer:
         self.preference = 0
         self.pref_function = pref_function
         self.auction_won = False
+        self.overbid = True
         
     def ask_bid(self, auction, current_bid):
         if (current_bid > self.max_bid) or (self.auction_won):
@@ -20,18 +21,14 @@ class Buyer:
         #collecting current bids:
         bids = self.act_bids
         bids[idx] = current_bid 
-        #calculating preferences:
-        current_preference = self.pref_function(bids)
-        if current_preference == idx:
-            #when the auction is preferred:
-            #checking whether the buyer is currently winning at another auction:
-            winning = False
-            for auction in self.auctions:
-                winning = (winning) or (auction.winner == self)
-            #if the buyer is not a winner of an auction, it can bid on the current auction:
-            return not(winning)
+        if self.overbid:
+            #calculating preferences:
+            current_preference = self.pref_function(bids)
+            self.overbid = current_preference != idx #buyer is not overbid when he accepts the bid
+            return current_preference == idx
         
-        return False
+    def tell_overbid(self, auction):
+        self.overbid = True
     
     def tell_won(self, auction):
         self.auction_won = True
@@ -58,9 +55,11 @@ class Auctioneer:
         for buyer in self.buyers:
             if buyer.ask_bid(self, self.current_price):
                 #buyer is willing to give the current bid
-                self.current_price += self.bid_step
-                self.winner = buyer
-                self.no_winner = 0
+                if not(self.winner is None):
+                    self.winner.tell_overbid(self) #telling previous winner that he is no longer winning
+                self.current_price += self.bid_step #price increased
+                self.winner = buyer #setting current winner
+                self.no_winner = 0 #bid received
                 was_winner = True
         
         if not(was_winner):
@@ -80,16 +79,16 @@ class Auctioneer:
 
 def _check_run_conditions(auctions, buyers):
     """Checks whether the auctions shall run one more round."""
-    if len(auctions)<=len(buyers):
-        num_running = 0
-        for auction in auctions:
-            if auction.status == "running": num_running += 1
-        return num_running > 0
-    else:
-        num_won = 0
-        for buyer in buyers:
-            if buyer.auction_won: num_won += 1
-        return num_won < len(buyers)
+    #if len(auctions)<=len(buyers):
+    num_running = 0
+    for auction in auctions:
+        if auction.status == "running": num_running += 1
+    return num_running > 0
+    #else:
+    #    num_won = 0
+    #    for buyer in buyers:
+    #        if buyer.auction_won: num_won += 1
+    #    return num_won < len(buyers)
 
 def run_auctions(auctions, buyers, run_to_completeness=True):
     #initializing auctions:
@@ -125,10 +124,12 @@ def run_auctions(auctions, buyers, run_to_completeness=True):
     new_auctions, new_buyers = [], [] #lists of new participants
     auction_map = [] # mapping new indices to the original ones
     
+    #creating new auctions:
     for auction in auctions_terminated:
         new_auction = Auctioneer(auction.starting_price, auction.bid_step)
         new_auctions.append(new_auction)
         auction_map.append(auctions.index(auction))
+    #creating new buyers:
     for i in buyer_map:
         new_buyer = Buyer(new_auctions, buyers[i].max_bid, buyers[i].pref_function)
         new_buyers.append(new_buyer)

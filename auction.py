@@ -23,7 +23,7 @@ class Buyer:
         bids[idx] = current_bid 
         if self.overbid:
             #calculating preferences:
-            current_preference = self.pref_function(bids)
+            current_preference = self.pref_function(self, bids)
             self.overbid = current_preference != idx #buyer is not overbid when he accepts the bid
             return current_preference == idx
         

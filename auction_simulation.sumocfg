@@ -1,0 +1,16 @@
+<configuration>
+	<input>
+		<net-file value="scenario/network.net.xml"/>
+		<additional-files value="scenario/parkings.add.xml,scenario/parking_rerouters.add.xml,scenario/rerouter_vtype.xml"/>
+	</input>
+	
+	
+	<time>
+		<begin value="0"/>
+		<end value = "600" />
+	</time>
+	
+	<output>
+		<summary-output value="outputs/auction_output.xml" />
+	</output>
+</configuration>

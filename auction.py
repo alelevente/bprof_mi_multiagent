@@ -4,7 +4,7 @@ import numpy as np
 ############################################
 # Buyer implementation:
 class Buyer:
-    def __init__(self, auctions, max_bid, pref_function):
+    def __init__(self, auctions, max_bid, pref_function, buyer_id=""):
         self.auctions = auctions[:]
         self.max_bid = max_bid
         self.act_bids = [0 for i in range(len(auctions))]
@@ -12,6 +12,7 @@ class Buyer:
         self.pref_function = pref_function
         self.auction_won = False
         self.overbid = True
+        self.id = buyer_id
         
     def ask_bid(self, auction, current_bid):
         if (current_bid > self.max_bid) or (self.auction_won):
@@ -131,7 +132,7 @@ def run_auctions(auctions, buyers, run_to_completeness=True):
         auction_map.append(auctions.index(auction))
     #creating new buyers:
     for i in buyer_map:
-        new_buyer = Buyer(new_auctions, buyers[i].max_bid, buyers[i].pref_function)
+        new_buyer = Buyer(new_auctions, buyers[i].max_bid, buyers[i].pref_function, buyers[i].id)
         new_buyers.append(new_buyer)
     if (len(new_auctions) > 0) and (len(new_buyers) > 0):
         new_run_results = run_auctions(new_auctions, new_buyers, run_to_completeness)

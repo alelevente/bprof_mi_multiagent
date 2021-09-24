@@ -4,7 +4,7 @@ import numpy as np
 ############################################
 # Buyer implementation:
 class Buyer:
-    def __init__(self, auctions, max_bid, pref_function, buyer_id=""):
+    def __init__(self, auctions, max_bid, pref_function, buyer_id):
         self.auctions = auctions[:]
         self.max_bid = max_bid
         self.act_bids = [0 for i in range(len(auctions))]
@@ -13,6 +13,9 @@ class Buyer:
         self.auction_won = False
         self.overbid = True
         self.id = buyer_id
+        self.auction_ids = []
+        for auc in self.auctions:
+            self.auction_ids.append(auc.id)
         
     def ask_bid(self, auction, current_bid):
         if (current_bid > self.max_bid) or (self.auction_won):
@@ -24,7 +27,7 @@ class Buyer:
         bids[idx] = current_bid 
         if self.overbid:
             #calculating preferences:
-            current_preference = self.pref_function(self, bids)
+            current_preference = self.pref_function(self.id, self.auction_ids, bids)
             self.overbid = current_preference != idx #buyer is not overbid when he accepts the bid
             return current_preference == idx
         
@@ -37,7 +40,7 @@ class Buyer:
 #############################################
 # Auctioneer implementation:
 class Auctioneer:
-    def __init__(self, starting_price, bid_step):
+    def __init__(self, starting_price, bid_step, auction_id, max_rounds = 15):
         self.starting_price = starting_price
         self.current_price = starting_price
         self.bid_step = bid_step
@@ -45,6 +48,8 @@ class Auctioneer:
         self.winner = None
         self.no_winner = 0
         self.status = "running" #status of the auction
+        self.id = auction_id
+        self.max_rounds = max_rounds
         
     def add_buyer(self, buyer):
         self.buyers.append(buyer)
@@ -66,7 +71,7 @@ class Auctioneer:
         if not(was_winner):
             self.no_winner += 1
         
-        if self.no_winner >= 3:
+        if self.no_winner >= self.max_rounds:
             #Going once, going twice, then its gone!
             if not(self.winner is None):
                 self.status = "won"
@@ -85,13 +90,9 @@ def _check_run_conditions(auctions, buyers):
     for auction in auctions:
         if auction.status == "running": num_running += 1
     return num_running > 0
-    #else:
-    #    num_won = 0
-    #    for buyer in buyers:
-    #        if buyer.auction_won: num_won += 1
-    #    return num_won < len(buyers)
-
-def run_auctions(auctions, buyers, run_to_completeness=True):
+    
+    
+def run_auctions(auctions, buyers, run_to_completeness=True, verbose=False):
     #initializing auctions:
     for buyer in buyers:
         for auction in auctions:
@@ -108,12 +109,13 @@ def run_auctions(auctions, buyers, run_to_completeness=True):
     for auction in auctions:
         if auction.status == "won":
             auctions_won.append(
-                {"auction_index": auctions.index(auction),
-                 "buyer_index": buyers.index(auction.winner),
+                {"auction_id": auction.id,
+                 "buyer_id": auction.winner.id,
                  "price": auction.current_price-auction.bid_step})
         else:
             auctions_terminated.append(auction)
             
+    print("%d auctions are won from %d"%(len(auctions_won), len(auctions)))
     if not(run_to_completeness): return auctions_won
     #when running to completeness:
     buyer_map = []
@@ -127,7 +129,7 @@ def run_auctions(auctions, buyers, run_to_completeness=True):
     
     #creating new auctions:
     for auction in auctions_terminated:
-        new_auction = Auctioneer(auction.starting_price, auction.bid_step)
+        new_auction = Auctioneer(auction.starting_price, auction.bid_step, auction.id)
         new_auctions.append(new_auction)
         auction_map.append(auctions.index(auction))
     #creating new buyers:
@@ -139,9 +141,5 @@ def run_auctions(auctions, buyers, run_to_completeness=True):
         
         #mapping back to original indices:
         for result in new_run_results:
-            auctions_won.append({
-                "auction_index": auction_map[result["auction_index"]],
-                "buyer_index": buyer_map[result["buyer_index"]],
-                "price": result["price"]
-            })
+            auctions_won.append(result)
     return auctions_won

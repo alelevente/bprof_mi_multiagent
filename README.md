@@ -35,7 +35,7 @@ By the end of the laboratory, the students are expected to:
 
 [x] Providing the auction backend
 
-[] Elaborating the laboratory tasks
+[/] Elaborating the laboratory tasks
 
 [] Conducting measurements
 

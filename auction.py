@@ -115,7 +115,7 @@ def run_auctions(auctions, buyers, run_to_completeness=True, verbose=False):
         else:
             auctions_terminated.append(auction)
             
-    print("%d auctions are won from %d"%(len(auctions_won), len(auctions)))
+    print("%d out of %d auctions are won"%(len(auctions_won), len(auctions)))
     if not(run_to_completeness): return auctions_won
     #when running to completeness:
     buyer_map = []

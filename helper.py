@@ -16,6 +16,29 @@ import auction
 #          Miscellaneous functions         #
 ############################################
 
+def print_price_differences(starting_prices, auction_results):
+    """Prints differences between original starting prices and actual parking prices
+       after running the auction method. It is a worst case estimation:
+       Starting prices are first ordered ascendingly, then the first
+       `len(auction_results)` part of the list is summed.
+       ----------
+       parameters:
+        - starting_prices: array defining the original parking prices
+        - auction_results: the dictionary containing the results of the auction"""
+    vehicles = len(auction_results)
+    original_price = np.sum(np.sort(starting_prices)[:vehicles])
+    auction_price = 0
+    for r in auction_results:
+        auction_price += r["price"]
+    print("Cummulated parking prices (original):\t\t%f"%original_price)
+    print("Cummulated parking prices (after auctions):\t%f"%auction_price)
+    print("Difference is {:2.2%}".format((auction_price-original_price)/original_price))
+    
+
+def run_auctions(auctions, buyers, verbose=False):
+    """Calls auction.run_auctions method"""
+    return auction.run_auctions(auctions, buyers, verbose)
+
 def read_movements(filename: str) -> list:
     '''Reads the given route file and returns the edges of the routes'''
     
@@ -38,7 +61,7 @@ def get_distance_to_parkings(traci, vehicle_id: str, sumo_parkings_lane_id: list
     return distances
 
 
-def read_pl_capacities(filename: str) -> (list,list):
+def read_parking_lots(filename: str) -> (list,list):
     '''Reads an additional file that contains parking lot definitions. Returns the parking lot ids and the corresp. capacities'''
     tree = ET.parse(filename)
     root = tree.getroot()
@@ -67,7 +90,7 @@ def init_auction_method(parking_capacities, vehicle_ids, starting_prices, prefer
     
     for pcap in parking_capacities:
         for i in range(pcap):
-            auctions.append(auction.Auctioneer(starting_prices[len(auctions)], bid_step, "auc%d"%i))
+            auctions.append(auction.Auctioneer(starting_prices[len(auctions)], bid_step, "auc%d"%len(auctions)))
             
     buyers = [auction.Buyer(auctions, max_price, preference_function, buyer_id=vehicle_ids[i]) for i in range(len(vehicle_ids))]
     return auctions, buyers
@@ -118,8 +141,21 @@ def run_basic_simulation(gui_needed: bool, scenario: str):
     
     traci.close()
     
+def _remove_unauthorized_parking(parking_map):
+    """removes vehicle that is parked by SUMO instead of our solution"""
+    for parking_id in parking_map.values():
+        vehicle_list = traci.parkingarea.getVehicleIDs(parking_id)
+        for veh_id in vehicle_list:
+            if parking_map[veh_id] != parking_id:
+                try:
+                    traci.vehicle.resume(veh_id)
+                    traci.vehicle.changeTarget(veh_id, parking_map[veh_id].split("pl")[-1])
+                    traci.vehicle.setParkingAreaStop(veh_id, parking_map[veh_id], duration=86400)
+                except TraCIException:
+                    pass
 
-def init_controlled_simulation(gui_needed: bool, scenario: str, output_file, movements: list, parking_lot_file: str):
+
+def init_controlled_simulation(gui_needed: bool, scenario: str, movements: list, parking_lot_ids: list, output_file: str):
     '''Initializes a TraCI-controlled simulation. Runs simulation until each vehicles get departed.
        Returns obtained distances to parking lots, parking lot ids and parking lot capacities.
        ----------------
@@ -129,11 +165,14 @@ def init_controlled_simulation(gui_needed: bool, scenario: str, output_file, mov
         - parking_lot_file: path to the file defining parkingAreas
         
        returns:
-        the distances between vehicles and parking lots, parking lot ids, parking lot capacities, vehicle ids'''
+        the distances between vehicles and parking lots, together with vehicle ids, and number of occupied parking lots per parking areas'''
+    
     #preparing command line parameters for SUMO and TraCI:
     traci_commands = []
     if gui_needed:
         traci_commands.append("sumo-gui")
+        traci_commands.append("-d")
+        traci_commands.append("200")
     else:
         traci_commands.append("sumo")
     traci_commands.append("-c")
@@ -149,19 +188,22 @@ def init_controlled_simulation(gui_needed: bool, scenario: str, output_file, mov
         traci.simulationStep()
         dep_num += traci.simulation.getDepartedNumber()
     
-    #collecting parking capacities:
-    p_ids, p_caps = read_pl_capacities(parking_lot_file)
+    #collecting distances to parking lots:
     distances = {}
-    p_edges = [p_id.split("pl")[-1] for p_id in p_ids]
+    p_edges = [p_id.split("pl")[-1] for p_id in parking_lot_ids]
     veh_ids = traci.vehicle.getIDList()
     for id_ in veh_ids:
         distances[id_] = get_distance_to_parkings(traci, id_, p_edges)
+        
+    parking_lot_occups = []
+    for p_id in parking_lot_ids:
+        parking_lot_occups.append(traci.parkingarea.getVehicleCount(p_id))
     
-    return distances, p_ids, p_caps, veh_ids
+    return distances, veh_ids, parking_lot_occups
 
 
 
-def simulate_after_auction(traci, parking_mapping, max_step = 600):
+def simulate_after_auction(parking_mapping, max_step = 600):
     """Conducts simulations until a given timestamp. Within each step,
         the function tries to redirect vehicles to a designated parking lot.
         ----------------
@@ -177,13 +219,14 @@ def simulate_after_auction(traci, parking_mapping, max_step = 600):
              
         #redirecting vehicles to parking lots:
         veh_list = traci.vehicle.getIDList()
+        _remove_unauthorized_parking(parking_mapping)
         for v in veh_list:
             try:
                 traci.vehicle.changeTarget(v, parking_mapping[v].split("pl")[-1])
                 traci.vehicle.setParkingAreaStop(v, parking_mapping[v], duration=86400)
             except:
                 pass
-    traci.close
+    traci.close()
 
 ############################################
 #        Output processing functions       #

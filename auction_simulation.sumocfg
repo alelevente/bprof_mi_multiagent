@@ -1,0 +1,14 @@
+<configuration>
+	<input>
+		<net-file value="scenario/network.net.xml"/>
+		<route-files value="scenario/parking_routes.rou.xml"/>
+		<additional-files value="scenario/parkings.add.xml,scenario/rerouter_vtype.xml"/>
+	</input>
+	
+	
+	<time>
+		<begin value="0"/>
+		<end value = "600" />
+	</time>
+	
+</configuration>

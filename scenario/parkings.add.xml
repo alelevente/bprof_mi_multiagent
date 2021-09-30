@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<additionals>
+	<parkingArea endPos="151.590000" id="pl383" lane="383_0" roadsideCapacity="25" startPos="0"/>
+	<parkingArea endPos="114.340000" id="pl338" lane="338_0" roadsideCapacity="19" startPos="0"/>
+	<parkingArea endPos="98.440000" id="pl336" lane="336_0" roadsideCapacity="16" startPos="0"/>
+	<parkingArea endPos="118.200000" id="pl-13" lane="-13_0" roadsideCapacity="19" startPos="0"/>
+	<parkingArea endPos="160.290000" id="pl-356" lane="-356_0" roadsideCapacity="26" startPos="0"/>
+	<parkingArea endPos="213.940000" id="pl330" lane="330_0" roadsideCapacity="35" startPos="0"/>
+	<parkingArea endPos="216.480000" id="pl-3" lane="-3_0" roadsideCapacity="36" startPos="0"/>
+	<parkingArea endPos="118.990000" id="pl344" lane="344_0" roadsideCapacity="19" startPos="0"/>
+	<parkingArea endPos="198.750000" id="pl-138" lane="-138_0" roadsideCapacity="33" startPos="0"/>
+</additionals>

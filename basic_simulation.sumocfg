@@ -1,0 +1,17 @@
+<configuration>
+	<input>
+		<net-file value="scenario/network.net.xml"/>
+		<route-files value="scenario/parking_routes.rou.xml"/>
+		<additional-files value="scenario/parkings.add.xml,scenario/parking_rerouters.add.xml"/>
+	</input>
+	
+	
+	<time>
+		<begin value="0"/>
+		<end value = "600" />
+	</time>
+	
+	<output>
+		<summary-output value="outputs/basic_output.xml" />
+	</output>
+</configuration>

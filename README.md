@@ -39,6 +39,8 @@ By the end of the laboratory, the students are expected to:
 
 [/] Checking laboratory tasks
 
+[/] Creating a VirtualBox vm
+
 [] Conducting measurements
 
 [] Asking for feedbacks

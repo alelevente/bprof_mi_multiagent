@@ -37,7 +37,7 @@ def print_price_differences(starting_prices, auction_results):
 
 def run_auctions(auctions, buyers, verbose=False):
     """Calls auction.run_auctions method"""
-    return auction.run_auctions(auctions, buyers, verbose)
+    return auction.run_auctions(auctions, buyers, verbose=verbose)
 
 def read_movements(filename: str) -> list:
     '''Reads the given route file and returns the edges of the routes'''
@@ -54,10 +54,10 @@ def read_movements(filename: str) -> list:
 
 def get_distance_to_parkings(traci, vehicle_id: str, sumo_parkings_lane_id: list) -> np.array:
     '''Collecting distances of parking lots for each vehicles'''
-    distances = []
+    distances = {}
     for p in sumo_parkings_lane_id:
-        distances.append(traci.simulation.getDistanceRoad(
-            traci.vehicle.getRoadID(vehicle_id), 0, p, 0))
+        distances[p] = traci.simulation.getDistanceRoad(
+            traci.vehicle.getRoadID(vehicle_id), 0, p, 0)
     return distances
 
 
@@ -65,12 +65,10 @@ def read_parking_lots(filename: str) -> (list,list):
     '''Reads an additional file that contains parking lot definitions. Returns the parking lot ids and the corresp. capacities'''
     tree = ET.parse(filename)
     root = tree.getroot()
-    p_ids = []
-    p_capacities = []
+    p_capacities = {}
     for parea in root:
-        p_ids.append(parea.attrib["id"])
-        p_capacities.append(parea.attrib["roadsideCapacity"])
-    return p_ids, p_capacities
+        p_capacities[parea.attrib["id"]] = int(parea.attrib["roadsideCapacity"])
+    return p_capacities
 
 
 def init_auction_method(parking_capacities, vehicle_ids, starting_prices, preference_function, bid_step = 10, max_price = 1000)-> (list, list):
@@ -88,11 +86,14 @@ def init_auction_method(parking_capacities, vehicle_ids, starting_prices, prefer
     auctions = []
     buyers = []
     
+    j = 0
     for pcap in parking_capacities:
-        for i in range(pcap):
-            auctions.append(auction.Auctioneer(starting_prices[len(auctions)], bid_step, "auc%d"%len(auctions)))
+        for i in range(parking_capacities[pcap]):
+            p_edge = pcap.split("pa")[-1]
+            auctions.append(auction.Auctioneer(starting_prices[p_edge], bid_step, f"auc_{p_edge}_{len(auctions)}"))
+        j += 1
             
-    buyers = [auction.Buyer(auctions, max_price, preference_function, buyer_id=vehicle_ids[i]) for i in range(len(vehicle_ids))]
+    buyers = [auction.Buyer(auctions, max_price, preference_function, buyer_id=i) for i in vehicle_ids]
     return auctions, buyers
 
 def map_auction_to_parking_area(auction_id, parking_capacities, parking_ids):
@@ -107,11 +108,12 @@ def map_auction_to_parking_area(auction_id, parking_capacities, parking_ids):
             tot += parking_capacities[i]
             i += 1
             
-def auction_results_to_parking_mapping(auction_results, buyers, parking_capacities, parking_ids):
+def auction_results_to_parking_mapping(auction_results):
     result_map = {}
     for i, auc in enumerate(auction_results):
-        p_area = map_auction_to_parking_area(auc["auction_id"], parking_capacities, parking_ids)
-        result_map[auc["buyer_id"]] = p_area
+        edge = auc["auction_id"].split("auc_pl")[-1]
+        edge = edge.split("_")[0]
+        result_map[auc["buyer_id"]] = f"pl{edge}"
     return result_map
 
 ############################################
@@ -131,15 +133,19 @@ def run_basic_simulation(gui_needed: bool, scenario: str):
         sumo_cmd.append("-d")
         sumo_cmd.append("200")
     #starting SUMO server:
-    traci.start(sumo_cmd)
-    
-    #conducting the simulation:
-    step = 0
-    while step < 600:
-        step += 1
-        traci.simulationStep()
-    
-    traci.close()
+    try:
+        traci.start(sumo_cmd)
+
+        #conducting the simulation:
+        step = 0
+        while step < 600:
+            step += 1
+            traci.simulationStep()
+
+    except Exception as e:
+        print(e)
+    finally:
+        traci.close()
     
 def _remove_unauthorized_parking(parking_map):
     """removes vehicle that is parked by SUMO instead of our solution"""
@@ -155,7 +161,7 @@ def _remove_unauthorized_parking(parking_map):
                     pass
 
 
-def init_controlled_simulation(gui_needed: bool, scenario: str, movements: list, parking_lot_ids: list, output_file: str):
+def init_controlled_simulation(gui_needed: bool, scenario: str, movements: list, parkings: dict, output_file: str):
     '''Initializes a TraCI-controlled simulation. Runs simulation until each vehicles get departed.
        Returns obtained distances to parking lots, parking lot ids and parking lot capacities.
        ----------------
@@ -190,14 +196,21 @@ def init_controlled_simulation(gui_needed: bool, scenario: str, movements: list,
     
     #collecting distances to parking lots:
     distances = {}
+    parking_lot_ids = parkings.keys()
     p_edges = [p_id.split("pl")[-1] for p_id in parking_lot_ids]
-    veh_ids = traci.vehicle.getIDList()
+    veh_list = traci.vehicle.getIDList()
+    veh_ids = []
+    for veh in veh_list:
+        if not(traci.vehicle.isStopped(veh)):
+            veh_ids.append(veh)
     for id_ in veh_ids:
+        if not(id_ in distances):
+            distances[id_] = {}
         distances[id_] = get_distance_to_parkings(traci, id_, p_edges)
         
-    parking_lot_occups = []
+    parking_lot_occups = {}
     for p_id in parking_lot_ids:
-        parking_lot_occups.append(traci.parkingarea.getVehicleCount(p_id))
+        parking_lot_occups[p_id] = int(traci.parkingarea.getVehicleCount(p_id))
     
     return distances, veh_ids, parking_lot_occups
 
@@ -219,7 +232,6 @@ def simulate_after_auction(parking_mapping, max_step = 600):
              
         #redirecting vehicles to parking lots:
         veh_list = traci.vehicle.getIDList()
-        _remove_unauthorized_parking(parking_mapping)
         for v in veh_list:
             try:
                 traci.vehicle.changeTarget(v, parking_mapping[v].split("pl")[-1])

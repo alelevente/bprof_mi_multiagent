@@ -7,7 +7,7 @@ class Buyer:
     def __init__(self, auctions, max_bid, pref_function, buyer_id):
         self.auctions = auctions[:]
         self.max_bid = max_bid
-        self.act_bids = [0 for i in range(len(auctions))]
+        self.act_bids = {}
         self.preference = 0
         self.pref_function = pref_function
         self.auction_won = False
@@ -16,20 +16,19 @@ class Buyer:
         self.auction_ids = []
         for auc in self.auctions:
             self.auction_ids.append(auc.id)
+            self.act_bids[auc.id] = auc.starting_price
         
     def ask_bid(self, auction, current_bid):
         if (current_bid > self.max_bid) or (self.auction_won):
             return False
         
-        idx = self.auctions.index(auction) #identifying auction
         #collecting current bids:
-        bids = self.act_bids
-        bids[idx] = current_bid 
+        self.act_bids[auction.id] = current_bid 
         if self.overbid:
             #calculating preferences:
-            current_preference = self.pref_function(self.id, self.auction_ids, bids)
-            self.overbid = current_preference != idx #buyer is not overbid when he accepts the bid
-            return current_preference == idx
+            current_preference = self.pref_function(self.id, self.auction_ids, self.act_bids)
+            self.overbid = current_preference != auction.id #buyer is not overbid when he accepts the bid
+            return current_preference == auction.id
         
     def tell_overbid(self, auction):
         self.overbid = True
@@ -40,7 +39,7 @@ class Buyer:
 #############################################
 # Auctioneer implementation:
 class Auctioneer:
-    def __init__(self, starting_price, bid_step, auction_id, max_rounds = 15):
+    def __init__(self, starting_price, bid_step, auction_id, max_rounds = 100):
         self.starting_price = starting_price
         self.current_price = starting_price
         self.bid_step = bid_step
@@ -59,7 +58,7 @@ class Auctioneer:
         #check if buyers want to bid at the current price:
         was_winner = False
         for buyer in self.buyers:
-            if buyer.ask_bid(self, self.current_price):
+            if (buyer!=self.winner) and (buyer.ask_bid(self, self.current_price)):
                 #buyer is willing to give the current bid
                 if not(self.winner is None):
                     self.winner.tell_overbid(self) #telling previous winner that he is no longer winning
@@ -87,12 +86,18 @@ def _check_run_conditions(auctions, buyers):
     """Checks whether the auctions shall run one more round."""
     #if len(auctions)<=len(buyers):
     num_running = 0
+    num_not_winning = 0
     for auction in auctions:
         if auction.status == "running": num_running += 1
-    return num_running > 0
+    for buyer in buyers:
+        if not(buyer.auction_won): num_not_winning += 1
+    return (num_running > 0) and (num_not_winning > 0)
     
     
 def run_auctions(auctions, buyers, run_to_completeness=True, verbose=False):
+    if verbose:
+        print(f"{len(auctions)} auctions initialized with {len(buyers)} buyers.")
+        
     #initializing auctions:
     for buyer in buyers:
         for auction in auctions:
@@ -114,8 +119,9 @@ def run_auctions(auctions, buyers, run_to_completeness=True, verbose=False):
                  "price": auction.current_price-auction.bid_step})
         else:
             auctions_terminated.append(auction)
-            
-    print("%d out of %d auctions are won"%(len(auctions_won), len(auctions)))
+    
+    if verbose:
+        print("%d out of %d auctions are won"%(len(auctions_won), len(auctions)))
     if not(run_to_completeness): return auctions_won
     #when running to completeness:
     buyer_map = []
@@ -137,7 +143,7 @@ def run_auctions(auctions, buyers, run_to_completeness=True, verbose=False):
         new_buyer = Buyer(new_auctions, buyers[i].max_bid, buyers[i].pref_function, buyers[i].id)
         new_buyers.append(new_buyer)
     if (len(new_auctions) > 0) and (len(new_buyers) > 0):
-        new_run_results = run_auctions(new_auctions, new_buyers, run_to_completeness)
+        new_run_results = run_auctions(new_auctions, new_buyers, run_to_completeness, verbose)
         
         #mapping back to original indices:
         for result in new_run_results:

@@ -145,20 +145,7 @@ def run_basic_simulation(gui_needed: bool, scenario: str):
     except Exception as e:
         print(e)
     finally:
-        traci.close()
-    
-def _remove_unauthorized_parking(parking_map):
-    """removes vehicle that is parked by SUMO instead of our solution"""
-    for parking_id in parking_map.values():
-        vehicle_list = traci.parkingarea.getVehicleIDs(parking_id)
-        for veh_id in vehicle_list:
-            if parking_map[veh_id] != parking_id:
-                try:
-                    traci.vehicle.resume(veh_id)
-                    traci.vehicle.changeTarget(veh_id, parking_map[veh_id].split("pl")[-1])
-                    traci.vehicle.setParkingAreaStop(veh_id, parking_map[veh_id], duration=86400)
-                except TraCIException:
-                    pass
+        traci.close(wait=False)
 
 
 def init_controlled_simulation(gui_needed: bool, scenario: str, movements: list, parkings: dict, output_file: str):
@@ -225,20 +212,19 @@ def simulate_after_auction(parking_mapping, max_step = 600):
         parking_mapping: a map that assigns vehicles (keys) to parking lots (values),
         max_step: simulation will run until this timestamp is reached"""
     
-    step = 1
+    #redirecting vehicles to parking lots:
+    for v in parking_mapping:
+        try:
+            traci.vehicle.replaceStop(v, 0, parking_mapping[v], flags=65, duration=86400)
+        except:
+            pass
+        
+    step = 0
     while step < max_step:
         step += 1
         traci.simulationStep()
              
-        #redirecting vehicles to parking lots:
-        veh_list = traci.vehicle.getIDList()
-        for v in veh_list:
-            try:
-                traci.vehicle.changeTarget(v, parking_mapping[v].split("pl")[-1])
-                traci.vehicle.setParkingAreaStop(v, parking_mapping[v], duration=86400)
-            except:
-                pass
-    traci.close()
+    traci.close(wait=False)
 
 ############################################
 #        Output processing functions       #
